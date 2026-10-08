@@ -1,0 +1,59 @@
+name: WoW Forever Countdown
+
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: 'Create the countdown message once'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wow-countdown
+  cancel-in-progress: true
+
+jobs:
+  update:
+    if: github.event_name == 'workflow_dispatch' || vars.DISCORD_MESSAGE_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install Pillow==11.3.0 requests==2.32.5
+
+      - name: Download Cinzel font
+        run: |
+          curl --fail --location --retry 3 \
+            'https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf' \
+            --output Cinzel.ttf
+
+      - name: Update countdown
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ vars.DISCORD_CHANNEL_ID }}
+          DISCORD_MESSAGE_ID: ${{ vars.DISCORD_MESSAGE_ID }}
+          BOOTSTRAP: ${{ inputs.bootstrap }}
+        run: |
+          set -e
+          if [ "$BOOTSTRAP" = "true" ]; then
+            python countdown.py --create
+          else
+            for update in 1 2 3 4 5; do
+              python countdown.py
+              if [ "$update" -lt 5 ]; then
+                sleep 60
+              fi
+            done
+          fi
